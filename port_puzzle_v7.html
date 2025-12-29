@@ -1,0 +1,1361 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>港湾業務パズル（プロトタイプ）</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --text:#e9eefc;
+      --muted:#a8b3d6;
+      --radius:14px;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    html, body { height:100%; }
+    body{
+      margin:0;
+      min-height:100%;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", Arial, sans-serif;
+      background: radial-gradient(1200px 800px at 30% 10%, #18255a 0%, var(--bg) 55%);
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+
+    header{
+      padding: 18px 18px 8px 18px;
+      display:flex;
+      gap:12px;
+      align-items:flex-end;
+      justify-content:space-between;
+      flex-wrap:wrap;
+      max-width: 1040px;
+      margin: 0 auto;
+    }
+    .title{display:flex; flex-direction:column; gap:2px;}
+    h1{margin:0; font-size:18px; letter-spacing:.2px; font-weight:800;}
+    .subtitle{color:var(--muted); font-size:12px; line-height:1.25;}
+
+    main{
+      padding: 10px 18px 20px 18px;
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:14px;
+      align-items:start;
+      max-width: 1040px;
+      margin: 0 auto;
+    }
+    @media (max-width: 980px){
+      main{grid-template-columns:1fr;}
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.06) 0%, rgba(255,255,255,.03) 100%);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      min-width:0;
+    }
+    .card .hd{
+      padding:12px 12px 10px 12px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      background: rgba(0,0,0,.15);
+      border-bottom:1px solid rgba(255,255,255,.08);
+      flex-wrap:wrap;
+      min-width:0;
+    }
+    .card .hd .meta{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      min-width:0;
+    }
+    .pill{
+      padding:6px 10px;
+      border-radius:999px;
+      background: rgba(122,162,255,.12);
+      border:1px solid rgba(122,162,255,.25);
+      font-size:12px;
+      color:var(--text);
+      display:flex;
+      gap:6px;
+      align-items:center;
+      white-space:nowrap;
+    }
+    .pill b{font-weight:900}
+    .btnrow{display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; min-width:0;}
+
+    button{
+      appearance:none;
+      border:none;
+      background: rgba(255,255,255,.10);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius: 12px;
+      font-weight:800;
+      font-size:13px;
+      letter-spacing:.2px;
+      border: 1px solid rgba(255,255,255,.12);
+      box-shadow: 0 6px 16px rgba(0,0,0,.25);
+      touch-action: manipulation;
+    }
+    button:active{transform: translateY(1px)}
+    button.primary{background: rgba(122,162,255,.22); border-color: rgba(122,162,255,.35);}
+    button.danger{background: rgba(255,107,107,.16); border-color: rgba(255,107,107,.30);}
+    button.ok{background: rgba(55,214,122,.14); border-color: rgba(55,214,122,.30);}
+    button:disabled{opacity:.55; filter:saturate(.7);}
+
+    .canvasWrap{padding: 12px; min-width:0;}
+    canvas{
+      width:100%;
+      aspect-ratio: 16 / 10;
+      height:auto;
+      display:block;
+      border-radius: 12px;
+      background: rgba(3,6,18,.65);
+      border:1px solid rgba(255,255,255,.08);
+      touch-action: none; /* iPad/タッチ環境で既定スクロールを抑止 */
+    }
+
+    .side{display:flex; flex-direction:column; gap:14px; min-width:0;display:none !important;
+    }
+    .controls{padding: 12px; display:grid; grid-template-columns: 1fr 1fr; gap:12px; min-width:0;}
+    @media (max-width: 520px){ .controls{grid-template-columns:1fr;} }
+
+    .pad{
+      background: rgba(0,0,0,.16);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius: 16px;
+      padding:12px;
+      min-width:0;
+    }
+    .pad h2{
+      margin:0 0 10px 0;
+      font-size:13px;
+      color:var(--muted);
+      font-weight:900;
+      letter-spacing:.2px;
+    }
+    .gridPad{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:8px;
+      align-items:center;
+      min-width:0;
+    }
+    .gridPad button{padding:14px 10px; font-size:14px; border-radius:14px;}
+    .wide{grid-column: 1 / -1;}
+
+    .status{padding: 12px;}
+    .kv{
+      display:grid;
+      grid-template-columns: 120px minmax(0, 1fr);
+      gap:8px 10px;
+      font-size:13px;
+      line-height:1.35;
+      padding:10px 12px;
+      background: rgba(0,0,0,.16);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius: 14px;
+      min-width:0;
+      overflow-wrap:anywhere;
+    }
+    .kv .k{color:var(--muted)}
+    .kv .v b{font-weight:900}
+    .hint{
+      margin-top:10px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.45;
+      padding:10px 12px;
+      background: rgba(0,0,0,.12);
+      border:1px solid rgba(255,255,255,.06);
+      border-radius: 14px;
+    }
+
+    .modalBackdrop{
+      position:fixed;
+      inset:0;
+      background: rgba(0,0,0,.6);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      z-index:50;
+    }
+    .modal{
+      width:min(820px, 100%);
+      background: linear-gradient(180deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,.04) 100%);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius: 18px;
+      box-shadow: 0 18px 60px rgba(0,0,0,.5);
+      overflow:hidden;
+      min-width:0;
+    }
+    .modal .mh{
+      padding:12px 14px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      background: rgba(0,0,0,.18);
+      border-bottom:1px solid rgba(255,255,255,.10);
+      flex-wrap:wrap;
+      min-width:0;
+    }
+    .modal .mh h3{
+      margin:0;
+      font-size:14px;
+      font-weight:900;
+      letter-spacing:.2px;
+    }
+    .modal .mb{
+      padding:14px;
+      font-size:13px;
+      line-height:1.55;
+      color:var(--text);
+    }
+
+    .truckBlock{display:grid; gap:10px; margin-top:10px;}
+    .truckRowLabel{
+      color: rgba(168,179,214,.95);
+      font-weight:900;
+      letter-spacing:.2px;
+      font-size:12px;
+      margin-top:4px;
+    }
+    .truckRow{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap:8px;
+    }
+    .slot{
+      background: rgba(0,0,0,.20);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius: 14px;
+      padding:10px 10px;
+      min-height:48px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      min-width:0;
+    }
+    .slot .idx{color:var(--muted); font-size:12px;}
+    .slot .num{font-weight:1000; font-size:16px; letter-spacing:.3px;}
+    .slot.ok{border-color: rgba(55,214,122,.35); background: rgba(55,214,122,.10);}
+    .slot.bad{border-color: rgba(255,107,107,.35); background: rgba(255,107,107,.10);}
+
+    .foot{
+      padding: 12px 18px 18px 18px;
+      color: var(--muted);
+      font-size: 11.5px;
+      line-height: 1.4;
+      opacity: .95;
+      max-width: 1040px;
+      margin: 0 auto;
+    }
+    .kbd{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      background: rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius: 8px;
+      padding: 1px 6px;
+      font-size: 11px;
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title">
+      <h1>港湾業務パズル（プロトタイプ）</h1>
+      <div class="subtitle">クレーン1台でコンテナを捌いて、各レーンのトラックへ適切な番号帯を積み込む。</div>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <div class="hd">
+        <div class="meta">
+          <div class="pill">操作数: <b id="moves">0</b></div>
+          <div class="pill">積込: <b id="loaded">0</b>/16</div>
+          <div class="pill">保持: <b id="holding">なし</b></div>
+        </div>
+        <div class="btnrow">
+          <button class="primary" id="btnGo">Go（採点）</button>
+          <button class="ok" id="btnReset">Reset（同じ並び）</button>
+          <button class="danger" id="btnNew">New（シャッフル）</button>
+        </div>
+      </div>
+      <div class="canvasWrap">
+        <canvas id="cv" width="1200" height="720" aria-label="game canvas"></canvas>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="card">
+        <div class="hd">
+          <div class="meta"><div class="pill">操作</div></div>
+          <div class="btnrow">
+            <button id="btnGrabDrop" class="primary">掴む</button>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="pad">
+            <h2>方向（1マス移動）</h2>
+            <div class="gridPad">
+              <div></div>
+              <button id="btnUp">↑</button>
+              <div></div>
+              <button id="btnLeft">←</button>
+              <button id="btnDown">↓</button>
+              <button id="btnRight">→</button>
+              <button id="btnStay" class="wide">（移動なし）</button>
+            </div>
+          </div>
+          <div class="pad">
+            <h2>ショートカット</h2>
+            <div class="kv" style="grid-template-columns: 1fr;">
+              <div class="v">
+                <div>矢印キー: 移動</div>
+                <div><span class="kbd">Space</span>: 掴む/離す</div>
+                <div><span class="kbd">Enter</span>: Go（採点）</div>
+                <div><span class="kbd">R</span>: Reset</div>
+                <div><span class="kbd">N</span>: New</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="hd">
+          <div class="meta"><div class="pill">ルール要約</div></div>
+        </div>
+        <div class="status">
+          <div class="kv">
+            <div class="k">盤面</div><div class="v">4行×4列（左=船側、右=トラック側）</div>
+            <div class="k">船</div><div class="v">4隻×各4個=計16個。各隻は開始時に左端へ1個下ろして開始</div>
+            <div class="k">自動搬入</div><div class="v">各行の左端が空なら、その船から次の1個が自動で出る</div>
+            <div class="k">自動積込</div><div class="v">右端列に置かれたコンテナは、その行（レーン）のトラックへ自動で積まれる</div>
+            <div class="k">トラック</div><div class="v">各レーンにトラック1台（積載枠は <b>1×4</b>）</div>
+            <div class="k">許容番号</div><div class="v">
+              レーン1: 1〜4 / レーン2: 5〜8 / レーン3: 9〜12 / レーン4: 13〜16
+            </div>
+            <div class="k">採点</div><div class="v">
+              積込時、そのレーンの許容番号なら1個 +50。さらに同一トラック内で右隣も許容番号かつ右隣の番号が大きければ +50。操作1回につき -1。
+            </div>
+          </div>
+          <div class="hint">
+            注意: 「Go（採点）」を押した時点のトラック状態と操作数からスコアを計算する。
+          </div>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <div class="modalBackdrop" id="modal">
+    <div class="modal">
+      <div class="mh">
+        <h3 id="modalTitle">採点結果</h3>
+        <button id="modalClose">閉じる</button>
+      </div>
+      <div class="mb" id="modalBody"></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    単一HTMLで動作するプロトタイプ。iPadではSafariで開いて操作できる。
+  </div>
+
+<script>
+(() => {
+  const ROWS = 4;
+  const COLS = 4;
+
+  // Lane-wise allowed number ranges (base score only applies if within range)
+  const ALLOWED = [
+    [1, 4],
+    [5, 8],
+    [9, 12],
+    [13, 16],
+  ];
+
+  // ===== Canvas =====
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+
+  // ===== UI refs =====
+  const ui = {
+    moves: document.getElementById('moves'),
+    loaded: document.getElementById('loaded'),
+    holding: document.getElementById('holding'),
+    btnGo: document.getElementById('btnGo'),
+    btnReset: document.getElementById('btnReset'),
+    btnNew: document.getElementById('btnNew'),
+    btnGrabDrop: document.getElementById('btnGrabDrop'),
+    btnUp: document.getElementById('btnUp'),
+    btnDown: document.getElementById('btnDown'),
+    btnLeft: document.getElementById('btnLeft'),
+    btnRight: document.getElementById('btnRight'),
+    btnStay: document.getElementById('btnStay'),
+    modal: document.getElementById('modal'),
+    modalTitle: document.getElementById('modalTitle'),
+    modalBody: document.getElementById('modalBody'),
+    modalClose: document.getElementById('modalClose'),
+  };
+
+  // ===== State =====
+  let rngSeed = null;
+  let initialQueues = null;
+
+  // grid[y][x] => container id or null
+  let grid = null;
+
+  // shipQueues[lane] => remaining containers on that ship (next-to-eject is shipQueues[lane][0])
+  let shipQueues = null;
+
+  // trucks[lane][slot] => container id or null (1x4, left->right; cab is on the right)
+  let trucks = null;
+
+  // number of crane operations
+  let moves = 0;
+
+  // crane position & holding id
+  let crane = { x: 0, y: 0, holding: null };
+
+  // animations: moving container rectangles to show "pushed out" / "pushed in"
+  // {id, type:'spawn'|'load', lane, slot?, t0, dur, from:{kind, ...}, to:{kind, ...}}
+  let anims = [];
+  let rafId = null;
+
+  // ===== Utility =====
+  function mulberry32(a){
+    return function(){
+      let t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function newSeed(){
+    return (Date.now() ^ (Math.random() * 0xFFFFFFFF)) >>> 0;
+  }
+  function shuffle(arr, rand){
+    for(let i = arr.length - 1; i > 0; i--){
+      const j = Math.floor(rand() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+  function deepCopyQueues(qs){
+    return qs.map(q => q.slice());
+  }
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+  function lerp(a, b, t){ return a + (b - a) * t; }
+  function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+  function easeInOutCubic(t){
+    return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3)/2;
+  }
+
+  function inAllowed(lane, v){
+    const [lo, hi] = ALLOWED[lane];
+    return v >= lo && v <= hi;
+  }
+
+  // "Stack/push" behavior: the first loaded ends up near the cab (rightmost),
+  // and subsequent loads are pushed in from the left, filling from right to left.
+  function truckNextSlot(lane){
+    for(let i=3;i>=0;i--){
+      if(trucks[lane][i] === null) return i;
+    }
+    return -1;
+  }
+
+  function totalLoaded(){
+    let n = 0;
+    for(let r=0;r<ROWS;r++){
+      for(let i=0;i<4;i++){
+        if(trucks[r][i] !== null) n++;
+      }
+    }
+    return n;
+  }
+
+  // ===== Canvas sizing =====
+  function fitCanvasToDevice(){
+    const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    const rect = cv.getBoundingClientRect();
+    const wCss = Math.max(560, Math.floor(rect.width));
+    const hCss = Math.floor(wCss * 0.72); // stable aspect
+
+    // setting the backing store (device pixels)
+    cv.width = Math.floor(wCss * dpr);
+    cv.height = Math.floor(hCss * dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+
+    return { W: wCss, H: hCss, dpr };
+  }
+
+  // ===== Layout computation (avoid getBoundingClientRect drift) =====
+  function computeLayout(W, H){
+    const pad = 16;
+    const legendH = 78;
+
+    const boardX = pad;
+    const boardY = pad + legendH;
+    const boardW = W - pad*2;
+    const boardH = H - boardY - pad;
+
+    // units tuned to align rows (ship + grid + gap + truck)
+    const shipUnits = 2.9;   // enough room to show 4 cargo boxes + protrusion
+    const gapUnits  = 0.65;
+    const truckUnits=5.55;  // enough room for cargo + cab
+    const denom = shipUnits + COLS + gapUnits + truckUnits;
+
+    const cellSize = Math.floor(Math.min(boardH / ROWS, boardW / denom));
+    const gridW = cellSize * COLS;
+    const gridH = cellSize * ROWS;
+
+    const gridX = boardX + Math.floor(cellSize * shipUnits);
+    const gridY = boardY + Math.floor((boardH - gridH) / 2);
+
+    const shipX = boardX + 6;
+    const shipW = Math.floor(cellSize * shipUnits) - 12;
+
+    const dockGapW = Math.floor(cellSize * gapUnits);
+    const truckX = gridX + gridW + dockGapW;
+    const truckY = gridY;
+
+    return {
+      W, H, pad, legendH,
+      boardX, boardY, boardW, boardH,
+      cellSize, gridX, gridY, gridW, gridH,
+      shipX, shipW,
+      dockGapW,
+      truckX, truckY
+    };
+  }
+
+  function cellCenter(layout, x, y){
+    return {
+      x: layout.gridX + x*layout.cellSize + layout.cellSize*0.5,
+      y: layout.gridY + y*layout.cellSize + layout.cellSize*0.5,
+    };
+  }
+
+  // We model the "cargo hold exit" on the right end of the ship.
+  function shipExitCenter(layout, lane){
+    const rowTop = layout.gridY + lane*layout.cellSize;
+    const rowH = layout.cellSize;
+
+    const x = layout.shipX;
+    const w = layout.shipW;
+
+    // cargo hold area (must match drawShip)
+    const y = rowTop + Math.floor(rowH*0.18);
+    const h = Math.floor(rowH*0.64);
+
+    const holdX = x + Math.floor(w*0.12);
+    const holdY = y + Math.floor(h*0.12);
+    const holdW = Math.floor(w*0.76);
+    const holdH = Math.floor(h*0.44);
+
+    const miniW = Math.max(18, Math.floor(holdW * 0.24));
+    const miniH = Math.max(16, Math.floor(holdH * 0.96));
+
+    // exit where the next box protrudes from
+    const protrude = Math.floor(miniW * 0.55);
+    const px = holdX + holdW - miniW + protrude + Math.floor(miniW*0.45);
+    const py = holdY + Math.floor(holdH/2);
+
+    return { x: px, y: py, miniW, miniH };
+  }
+
+  function truckGeom(layout, lane){
+    const rowTop = layout.gridY + lane*layout.cellSize;
+    const rowH = layout.cellSize;
+
+    const cargoW = Math.floor(layout.cellSize * 3.25);
+    const cargoH = Math.floor(rowH * 0.72);
+    const cargoX = layout.truckX + Math.floor(layout.cellSize * 0.55);
+    const cargoY = rowTop + Math.floor(rowH*0.14);
+
+    const slotGap = Math.floor(layout.cellSize * 0.10);
+    const slotW = Math.floor((cargoW - slotGap*3) / 4);
+    const slotH = Math.floor(cargoH * 0.78);
+    const slotY = cargoY + Math.floor((cargoH - slotH)/2);
+
+    const entranceX = cargoX + Math.floor(slotW*0.12); // left entrance where "pusher" starts
+    const entranceY = slotY + slotH*0.5;
+
+    return { cargoX, cargoY, cargoW, cargoH, slotW, slotH, slotY, slotGap, entranceX, entranceY };
+  }
+
+  function truckSlotCenter(layout, lane, slot){
+    const g = truckGeom(layout, lane);
+    const cx = g.cargoX + slot*(g.slotW + g.slotGap) + g.slotW*0.5;
+    const cy = g.slotY + g.slotH*0.5;
+    return { x: cx, y: cy, ...g };
+  }
+
+  // ===== Animation helpers =====
+  function startAnimLoop(){
+    if(rafId !== null) return;
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function loop(now){
+    anims = anims.filter(a => (now - a.t0) < a.dur);
+    draw(now);
+    if(anims.length > 0) rafId = requestAnimationFrame(loop);
+    else rafId = null;
+  }
+
+  function addAnim(anim){
+    anim.t0 = performance.now();
+    anims.push(anim);
+    startAnimLoop();
+  }
+
+  function animProgress(now, a){
+    const t = clamp((now - a.t0) / a.dur, 0, 1);
+    const eased = (a.type === "spawn") ? easeOutCubic(t) : easeInOutCubic(t);
+    return { t, eased };
+  }
+
+  function isAnimatingId(id){
+    return anims.some(a => a.id === id);
+  }
+
+  // ===== Initialization =====
+  function buildQueues(seed){
+    const rand = mulberry32(seed);
+    const nums = Array.from({length: 16}, (_, i) => i + 1);
+    shuffle(nums, rand);
+    const queues = [];
+    for(let r=0;r<ROWS;r++){
+      queues.push(nums.slice(r*4, r*4 + 4));
+    }
+    return queues;
+  }
+
+  function resetFromQueues(queues){
+    shipQueues = deepCopyQueues(queues);
+    grid = Array.from({length: ROWS}, () => Array.from({length: COLS}, () => null));
+    trucks = Array.from({length: ROWS}, () => Array.from({length: 4}, () => null));
+    moves = 0;
+    crane = { x: 0, y: 0, holding: null };
+    anims = [];
+    rafId = null;
+
+    // each ship places one container at leftmost cell at start (no animation)
+    for(let r=0;r<ROWS;r++){
+      const first = shipQueues[r].shift();
+      grid[r][0] = first;
+    }
+    applyAuto(false);
+    syncUI();
+    draw(performance.now());
+  }
+
+  function newGame(){
+    rngSeed = newSeed();
+    initialQueues = buildQueues(rngSeed);
+    resetFromQueues(initialQueues);
+  }
+
+  function resetGame(){
+    if(!initialQueues) return;
+    resetFromQueues(initialQueues);
+  }
+
+  // ===== Rules =====
+  function applyAuto(withAnim=true){
+    // rule 3: if left cell is empty, ship pushes the "right-protruding" next cargo out
+    for(let r=0;r<ROWS;r++){
+      if(grid[r][0] === null && shipQueues[r].length > 0){
+        const next = shipQueues[r].shift();
+        grid[r][0] = next;
+        if(withAnim){
+          addAnim({
+            id: next,
+            type: "spawn",
+            lane: r,
+            dur: 520,
+            from: { kind:"shipExit", lane:r },
+            to:   { kind:"cell", x:0, y:r }
+          });
+        }
+      }
+    }
+
+    // rule 4: if rightmost column has containers, auto-load to lane's truck (only if truck has space)
+    const x = COLS - 1;
+    for(let r=0;r<ROWS;r++){
+      const v = grid[r][x];
+      if(v === null) continue;
+
+      const slot = truckNextSlot(r);
+      if(slot !== -1){
+        trucks[r][slot] = v;
+        grid[r][x] = null;
+        if(withAnim){
+          addAnim({
+            id: v,
+            type: "load",
+            lane: r,
+            slot: slot,
+            dur: 560,
+            from: { kind:"cell", x:x, y:r },
+            to:   { kind:"truck", lane:r, slot:slot }
+          });
+        }
+      }
+    }
+  }
+
+  function canMove(nx, ny){
+    return nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS;
+  }
+
+  function doMove(dx, dy){
+    const nx = crane.x + dx;
+    const ny = crane.y + dy;
+    if(!canMove(nx, ny)) return false;
+    crane.x = nx;
+    crane.y = ny;
+    return true;
+  }
+
+  function doGrabDrop(){
+    const cell = grid[crane.y][crane.x];
+    if(crane.holding === null){
+      if(cell === null) return false;
+      crane.holding = cell;
+      grid[crane.y][crane.x] = null;
+      return true;
+    } else {
+      if(cell !== null) return false;
+      grid[crane.y][crane.x] = crane.holding;
+      crane.holding = null;
+      return true;
+    }
+  }
+
+  function step(actionFn){
+    const ok = actionFn();
+    if(!ok) return;
+    moves += 1;
+    applyAuto(true);
+    syncUI();
+    draw(performance.now());
+  }
+
+  // ===== Scoring =====
+  function computeScoreBreakdown(){
+    let base = 0;
+    let bonus = 0;
+
+    // base: +50 for each container that is within lane's allowed range
+    for(let lane=0; lane<ROWS; lane++){
+      for(let i=0;i<4;i++){
+        const v = trucks[lane][i];
+        if(v !== null && inAllowed(lane, v)) base += 50;
+      }
+    }
+
+    // bonus: for each pair (i, i+1) that are both within allowed range, and right > left
+    for(let lane=0; lane<ROWS; lane++){
+      for(let i=0;i<3;i++){
+        const a = trucks[lane][i];
+        const b = trucks[lane][i+1];
+        if(a === null || b === null) continue;
+        if(!inAllowed(lane, a)) continue;
+        if(!inAllowed(lane, b)) continue;
+        if(b > a) bonus += 50;
+      }
+    }
+
+    const penalty = moves;
+    const total = base + bonus - penalty;
+    return { base, bonus, penalty, total };
+  }
+
+  function renderTruckHTML(){
+    const labels = [
+      "レーン1（1〜4）",
+      "レーン2（5〜8）",
+      "レーン3（9〜12）",
+      "レーン4（13〜16）",
+    ];
+
+    let html = `<div class="truckBlock">`;
+    for(let lane=0; lane<ROWS; lane++){
+      html += `<div class="truckRowLabel">${labels[lane]}</div>`;
+      html += `<div class="truckRow">`;
+      for(let i=0;i<4;i++){
+        const v = trucks[lane][i];
+        const ok = (v !== null && inAllowed(lane, v));
+        const cls = v === null ? "" : (ok ? "ok" : "bad");
+        html += `<div class="slot ${cls}">
+          <div class="idx">${i+1}</div>
+          <div class="num">${v === null ? "—" : v}</div>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+    return html;
+  }
+
+  function showModal(title, bodyHTML){
+    ui.modalTitle.textContent = title;
+    ui.modalBody.innerHTML = bodyHTML;
+    ui.modal.style.display = "flex";
+  }
+  function closeModal(){
+    ui.modal.style.display = "none";
+  }
+
+  // ===== Drawing primitives =====
+  function colorFor(n){
+    const hues = [210, 35, 140, 95, 260, 15, 185, 310];
+    const h = hues[(n-1) % hues.length];
+    return `hsl(${h} 85% 60%)`;
+  }
+
+  function drawRoundedRect(x, y, w, h, r){
+    const rr = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+rr, y);
+    ctx.arcTo(x+w, y, x+w, y+h, rr);
+    ctx.arcTo(x+w, y+h, x, y+h, rr);
+    ctx.arcTo(x, y+h, x, y, rr);
+    ctx.arcTo(x, y, x+w, y, rr);
+    ctx.closePath();
+  }
+
+  function drawContainerBox(x, y, w, h, id, label=true, fontScale=1.0){
+    // shadow
+    ctx.fillStyle = "rgba(0,0,0,.28)";
+    drawRoundedRect(x+2, y+4, w, h, Math.min(12, h*0.18));
+    ctx.fill();
+
+    // body
+    ctx.fillStyle = colorFor(id);
+    drawRoundedRect(x, y, w, h, Math.min(12, h*0.18));
+    ctx.fill();
+
+    // stripes
+    ctx.fillStyle = "rgba(255,255,255,.18)";
+    const s = Math.max(2, Math.floor(w*0.04));
+    ctx.fillRect(x + s, y + s, w - s*2, Math.max(2, Math.floor(h*0.14)));
+
+    // label
+    if(label){
+      const fs = Math.floor(h*0.56*fontScale);
+      ctx.font = `1000 ${fs}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Hiragino Sans, Noto Sans JP, Arial`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      // make numbers highly legible on any color
+      ctx.lineWidth = Math.max(2, Math.floor(fs*0.18));
+      ctx.strokeStyle = "rgba(0,0,0,.72)";
+      ctx.strokeText(String(id), x + w/2, y + h/2 + 1);
+
+      ctx.fillStyle = "rgba(255,255,255,.96)";
+      ctx.fillText(String(id), x + w/2, y + h/2 + 1);
+
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+      ctx.lineWidth = 1;
+    }
+  }
+
+  function drawDockAndBackground(layout){
+    // card backdrop
+    ctx.fillStyle = "rgba(255,255,255,.05)";
+    drawRoundedRect(layout.pad, layout.pad, layout.W - layout.pad*2, layout.H - layout.pad*2, 16);
+    ctx.fill();
+
+    // legend bar
+    ctx.fillStyle = "rgba(0,0,0,.18)";
+    drawRoundedRect(layout.pad+10, layout.pad+10, layout.W - (layout.pad+10)*2, layout.legendH, 14);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(233,238,252,.95)";
+    ctx.font = "700 14px ui-sans-serif, system-ui, -apple-system, Segoe UI, Hiragino Sans, Noto Sans JP, Arial";
+    ctx.fillText("港湾オペレーション（4×4グリッド）", layout.pad+26, layout.pad+38);
+
+    ctx.fillStyle = "rgba(168,179,214,.95)";
+    ctx.font = "12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Hiragino Sans, Noto Sans JP, Arial";
+    ctx.fillText("船: 右端が突き出された荷物が押し出される / トラック: 左から押し込み、満載なら留置", layout.pad+26, layout.pad+58);
+
+    // dock area behind grid/trucks
+    ctx.fillStyle = "rgba(0,0,0,.10)";
+    drawRoundedRect(layout.gridX - 10, layout.gridY - 10, layout.gridW + layout.dockGapW + Math.floor(layout.cellSize*6.15), layout.gridH + 20, 18);
+    ctx.fill();
+
+    // water strip behind ships
+    const waterX = layout.shipX - 8;
+    const waterY = layout.gridY - Math.floor(layout.cellSize*0.12);
+    const waterW = layout.shipW + 22;
+    const waterH = layout.gridH + Math.floor(layout.cellSize*0.24);
+
+    const g = ctx.createLinearGradient(waterX, waterY, waterX, waterY+waterH);
+    g.addColorStop(0, "rgba(40,90,160,.10)");
+    g.addColorStop(1, "rgba(40,90,160,.03)");
+    ctx.fillStyle = g;
+    drawRoundedRect(waterX, waterY, waterW, waterH, 16);
+    ctx.fill();
+  }
+
+  function drawShip(layout, lane){
+    const rowTop = layout.gridY + lane*layout.cellSize;
+    const rowH = layout.cellSize;
+
+    const x = layout.shipX;
+    const y = rowTop + Math.floor(rowH*0.18);
+    const w = layout.shipW;
+    const h = Math.floor(rowH*0.64);
+
+    // hull
+    ctx.fillStyle = "rgba(14, 22, 52, .78)";
+    drawRoundedRect(x + Math.floor(w*0.02), y + Math.floor(h*0.36), Math.floor(w*0.84), Math.floor(h*0.58), 14);
+    ctx.fill();
+
+    // bow triangle
+    ctx.fillStyle = "rgba(14, 22, 52, .78)";
+    ctx.beginPath();
+    const bx = x + Math.floor(w*0.86);
+    const by = y + Math.floor(h*0.36);
+    ctx.moveTo(bx, by);
+    ctx.lineTo(x + w, y + Math.floor(h*0.56));
+    ctx.lineTo(bx, y + Math.floor(h*0.94));
+    ctx.closePath();
+    ctx.fill();
+
+    // bridge (cabin)
+    ctx.fillStyle = "rgba(255,255,255,.09)";
+    drawRoundedRect(x + Math.floor(w*0.06), y + Math.floor(h*0.06), Math.floor(w*0.20), Math.floor(h*0.26), 10);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.12)";
+    ctx.stroke();
+
+    // cargo hold frame
+    const holdX = x + Math.floor(w*0.12);
+    const holdY = y + Math.floor(h*0.12);
+    const holdW = Math.floor(w*0.76);
+    const holdH = Math.floor(h*0.44);
+
+    ctx.fillStyle = "rgba(255,255,255,.09)";
+    drawRoundedRect(holdX, holdY, holdW, holdH, 12);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.18)";
+    ctx.stroke();
+
+    // lane label
+    ctx.fillStyle = "rgba(168,179,214,.92)";
+    ctx.font = `900 ${Math.floor(rowH*0.14)}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Hiragino Sans, Noto Sans JP, Arial`;
+    ctx.fillText(`船${lane+1}`, x + 6, rowTop + Math.floor(rowH*0.16));
+
+    // cargo inside hold (remaining ship queue)
+    // next-to-eject is q[0] and should protrude from the right end
+    const q = shipQueues[lane];
+    const miniW = Math.max(18, Math.floor(holdW * 0.24));
+    const miniH = Math.max(16, Math.floor(holdH * 0.96));
+    const gap = Math.max(4, Math.floor(holdW * 0.04));
+    const protrude = Math.floor(miniW * 0.55);
+
+    const maxShow = Math.min(4, q.length);
+    for(let i=0;i<maxShow;i++){
+      const id = q[i];
+      // place from right to left
+      let px = holdX + holdW - (i+1)*miniW - i*gap;
+      if(i === 0) px += protrude; // protrude the next cargo
+      const py = holdY + Math.floor((holdH - miniH)/2);
+      // slightly smaller label for the mini boxes
+      drawContainerBox(px, py, miniW, miniH, id, true, 0.92);
+    }
+
+    // pusher plate at hold exit
+    ctx.fillStyle = "rgba(255,255,255,.10)";
+    const plateW = Math.max(8, Math.floor(w*0.04));
+    const plateH = Math.floor(holdH*0.92);
+    drawRoundedRect(holdX + holdW - plateW - 4, holdY + Math.floor((holdH - plateH)/2), plateW, plateH, 6);
+    ctx.fill();
+  }
+
+  function drawTruck(layout, lane){
+    const rowTop = layout.gridY + lane*layout.cellSize;
+    const rowH = layout.cellSize;
+
+    const x0 = layout.truckX;
+
+    // geometry
+    const g = truckGeom(layout, lane);
+    const cargoX = g.cargoX;
+    const cargoY = g.cargoY;
+    const cargoW = g.cargoW;
+    const cargoH = g.cargoH;
+
+    const cabW = Math.floor(layout.cellSize * 0.92);
+    const cabH = Math.floor(rowH * 0.56);
+    const cabX = cargoX + cargoW + Math.floor(layout.cellSize*0.20);
+    const cabY = rowTop + Math.floor(rowH*0.28);
+
+    // lane label
+    ctx.fillStyle = "rgba(168,179,214,.92)";
+    ctx.font = `900 ${Math.floor(rowH*0.14)}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Hiragino Sans, Noto Sans JP, Arial`;
+    const [lo, hi] = ALLOWED[lane];
+    ctx.fillText(`トラック${lane+1}（${lo}〜${hi}）`, x0, rowTop + Math.floor(rowH*0.16));
+
+    // cargo frame
+    ctx.fillStyle = "rgba(255,255,255,.07)";
+    drawRoundedRect(cargoX, cargoY, cargoW, cargoH, 16);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.14)";
+    ctx.stroke();
+
+    // cab
+    ctx.fillStyle = "rgba(255,255,255,.08)";
+    drawRoundedRect(cabX, cabY, cabW, cabH, 16);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.14)";
+    ctx.stroke();
+
+    // window
+    ctx.fillStyle = "rgba(122,162,255,.18)";
+    drawRoundedRect(cabX + Math.floor(cabW*0.18), cabY + Math.floor(cabH*0.16), Math.floor(cabW*0.52), Math.floor(cabH*0.42), 10);
+    ctx.fill();
+
+    // wheels
+    const baseY = rowTop + Math.floor(rowH*0.80);
+    ctx.fillStyle = "rgba(0,0,0,.35)";
+    const wheelR = Math.max(5, Math.floor(rowH*0.10));
+    const w1x = cargoX + Math.floor(cargoW*0.22);
+    const w2x = cargoX + Math.floor(cargoW*0.72);
+    const w3x = cabX + Math.floor(cabW*0.25);
+    for(const wx of [w1x, w2x, w3x]){
+      ctx.beginPath();
+      ctx.arc(wx, baseY, wheelR, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,.10)";
+      ctx.beginPath();
+      ctx.arc(wx, baseY, Math.max(2, wheelR*0.38), 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(0,0,0,.35)";
+    }
+
+    // cargo slots + contents (visual "stack" from cab side to outside)
+    const slotY = g.slotY;
+    const slotW = g.slotW;
+    const slotH = g.slotH;
+    const slotGap = g.slotGap;
+
+    for(let i=0;i<4;i++){
+      const sx = cargoX + i*(slotW + slotGap);
+
+      // slot background
+      ctx.fillStyle = "rgba(0,0,0,.18)";
+      drawRoundedRect(sx, slotY, slotW, slotH, 12);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,.08)";
+      ctx.stroke();
+
+      const v = trucks[lane][i];
+      if(v !== null && !isAnimatingId(v)){
+        // draw inserted container, inset like it's "pushed in"
+        const insetX = Math.floor(slotW*0.10);
+        const insetY = Math.floor(slotH*0.10);
+        const px = sx + insetX;
+        const py = slotY + insetY;
+        const pw = slotW - insetX*2;
+        const ph = slotH - insetY*2;
+        drawContainerBox(px, py, pw, ph, v, true, 0.95);
+
+        if(!inAllowed(lane, v)){
+          ctx.fillStyle = "rgba(255,107,107,.18)";
+          drawRoundedRect(px, py, pw, ph, 12);
+          ctx.fill();
+        }
+      }
+    }
+
+    // cargo entrance mark (left side)
+    ctx.fillStyle = "rgba(255,255,255,.10)";
+    drawRoundedRect(cargoX - Math.floor(slotW*0.16), slotY + Math.floor(slotH*0.08), Math.floor(slotW*0.12), Math.floor(slotH*0.84), 8);
+    ctx.fill();
+  }
+
+  function drawGrid(layout){
+    // grid lines
+    ctx.strokeStyle = "rgba(42,58,106,.9)";
+    ctx.lineWidth = 1;
+
+    for(let x=0;x<=COLS;x++){
+      ctx.beginPath();
+      ctx.moveTo(layout.gridX + x*layout.cellSize, layout.gridY);
+      ctx.lineTo(layout.gridX + x*layout.cellSize, layout.gridY + layout.gridH);
+      ctx.stroke();
+    }
+    for(let y=0;y<=ROWS;y++){
+      ctx.beginPath();
+      ctx.moveTo(layout.gridX, layout.gridY + y*layout.cellSize);
+      ctx.lineTo(layout.gridX + layout.gridW, layout.gridY + y*layout.cellSize);
+      ctx.stroke();
+    }
+
+    // column labels
+    ctx.fillStyle = "rgba(168,179,214,.92)";
+    ctx.font = "900 12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Hiragino Sans, Noto Sans JP, Arial";
+    ctx.fillText("左端（押し出し）", layout.gridX, layout.gridY - 10);
+    ctx.fillText("右端（押し込み）", layout.gridX + layout.gridW - 92, layout.gridY - 10);
+
+    // cells contents (skip animating ids to avoid double draw)
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<COLS;c++){
+        const v = grid[r][c];
+        if(v === null) continue;
+        if(isAnimatingId(v)) continue;
+        const x = layout.gridX + c*layout.cellSize;
+        const y = layout.gridY + r*layout.cellSize;
+
+        const px = x + Math.floor(layout.cellSize*0.12);
+        const py = y + Math.floor(layout.cellSize*0.12);
+        const pw = Math.floor(layout.cellSize*0.76);
+        const ph = Math.floor(layout.cellSize*0.76);
+        drawContainerBox(px, py, pw, ph, v, true, 1.0);
+      }
+    }
+
+    // crane highlight
+    const cx = layout.gridX + crane.x*layout.cellSize;
+    const cy = layout.gridY + crane.y*layout.cellSize;
+
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(122,162,255,.95)";
+    ctx.strokeRect(cx + 2, cy + 2, layout.cellSize - 4, layout.cellSize - 4);
+
+    // hook line
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(122,162,255,.75)";
+    ctx.beginPath();
+    ctx.moveTo(cx + layout.cellSize*0.5, cy - 10);
+    ctx.lineTo(cx + layout.cellSize*0.5, cy + layout.cellSize*0.15);
+    ctx.stroke();
+
+    // holding (floating above)
+    if(crane.holding !== null){
+      const v = crane.holding;
+      const px = cx + Math.floor(layout.cellSize*0.12);
+      const py = cy - Math.floor(layout.cellSize*0.78);
+      const pw = Math.floor(layout.cellSize*0.76);
+      const ph = Math.floor(layout.cellSize*0.68);
+      drawContainerBox(px, py, pw, ph, v, true, 1.0);
+    }
+
+    ctx.lineWidth = 1;
+  }
+
+  function drawAnimations(layout, now){
+    for(const a of anims){
+      const { t, eased } = animProgress(now, a);
+
+      // source point
+      let fx, fy;
+      if(a.from.kind === "shipExit"){
+        const p = shipExitCenter(layout, a.from.lane);
+        fx = p.x; fy = p.y;
+      } else if(a.from.kind === "cell"){
+        const p = cellCenter(layout, a.from.x, a.from.y);
+        fx = p.x; fy = p.y;
+      } else {
+        fx = fy = 0;
+      }
+
+      // destination point
+      let tx, ty;
+      if(a.to.kind === "cell"){
+        const p = cellCenter(layout, a.to.x, a.to.y);
+        tx = p.x; ty = p.y;
+      } else if(a.to.kind === "truck"){
+        const p = truckSlotCenter(layout, a.to.lane, a.to.slot);
+        tx = p.x; ty = p.y;
+      } else {
+        tx = ty = 0;
+      }
+
+      // container size
+      const baseW = Math.floor(layout.cellSize*0.70);
+      const baseH = Math.floor(layout.cellSize*0.60);
+      const w = (a.type === "load") ? Math.floor(baseW*0.86) : baseW;
+      const h = (a.type === "load") ? Math.floor(baseH*0.84) : baseH;
+
+      let cx, cy;
+
+      if(a.type === "load"){
+        // path: cell -> cargo entrance -> slot (to feel "pushed in")
+        const g = truckGeom(layout, a.lane);
+        const ex = g.entranceX;
+        const ey = g.entranceY;
+
+        if(t < 0.38){
+          const tt = easeInOutCubic(t/0.38);
+          cx = lerp(fx, ex, tt);
+          cy = lerp(fy, ey, tt);
+        } else {
+          const tt = easeInOutCubic((t-0.38)/0.62);
+          cx = lerp(ex, tx, tt);
+          cy = lerp(ey, ty, tt);
+        }
+
+        drawContainerBox(Math.floor(cx - w/2), Math.floor(cy - h/2), w, h, a.id, true, 0.95);
+
+        // pusher bar behind (at the entrance)
+        ctx.fillStyle = "rgba(255,255,255,.12)";
+        const bw = Math.max(6, Math.floor(w*0.10));
+        const bh = Math.floor(h*0.92);
+        drawRoundedRect(Math.floor(cx - w/2 - bw - 3), Math.floor(cy - bh/2), bw, bh, 6);
+        ctx.fill();
+      } else {
+        // spawn: slight overshoot to emphasize "pushed out"
+        const ox = (tx - fx) * 0.06 * (1 - eased);
+        cx = lerp(fx, tx, eased) + ox;
+        cy = lerp(fy, ty, eased);
+
+        drawContainerBox(Math.floor(cx - w/2), Math.floor(cy - h/2), w, h, a.id, true, 1.0);
+      }
+    }
+  }
+
+  function draw(now){
+    const fit = fitCanvasToDevice();
+    const layout = computeLayout(fit.W, fit.H);
+
+    ctx.clearRect(0,0,fit.W,fit.H);
+
+    drawDockAndBackground(layout);
+
+    for(let lane=0; lane<ROWS; lane++){
+      drawShip(layout, lane);
+      drawTruck(layout, lane);
+    }
+
+    drawGrid(layout);
+
+    if(anims.length > 0) drawAnimations(layout, now);
+  }
+
+  // ===== UI sync =====
+  function syncUI(){
+    ui.moves.textContent = String(moves);
+    ui.loaded.textContent = String(totalLoaded());
+    ui.holding.textContent = (crane.holding === null) ? "なし" : String(crane.holding);
+    ui.btnGrabDrop.textContent = (crane.holding === null) ? "掴む" : "降ろす";
+    ui.btnGrabDrop.classList.toggle("ok", crane.holding !== null);
+  }
+
+  // ===== Events =====
+  ui.btnUp.addEventListener('click', () => step(() => doMove(0,-1)));
+  ui.btnDown.addEventListener('click', () => step(() => doMove(0, 1)));
+  ui.btnLeft.addEventListener('click', () => step(() => doMove(-1,0)));
+  ui.btnRight.addEventListener('click', () => step(() => doMove(1, 0)));
+  ui.btnStay.addEventListener('click', () => step(() => true));
+  ui.btnGrabDrop.addEventListener('click', () => step(() => doGrabDrop()));
+
+  ui.btnReset.addEventListener('click', () => resetGame());
+  ui.btnNew.addEventListener('click', () => newGame());
+
+  ui.btnGo.addEventListener('click', () => {
+    const { base, bonus, penalty, total } = computeScoreBreakdown();
+    const body = `
+      <div style="display:grid; gap:10px;">
+        <div class="kv">
+          <div class="k">積込数</div><div class="v"><b>${totalLoaded()}</b>/16</div>
+          <div class="k">基本点</div><div class="v"><b>+${base}</b>（レーン許容番号のみ）</div>
+          <div class="k">順序ボーナス</div><div class="v"><b>+${bonus}</b>（右隣も許容番号かつ右隣 > 左）</div>
+          <div class="k">操作ペナルティ</div><div class="v"><b>-${penalty}</b></div>
+          <div class="k">最終スコア</div><div class="v"><b>${total}</b></div>
+        </div>
+        <div style="color: rgba(168,179,214,.92); font-size:12px;">
+          各レーンの許容番号: レーン1=1〜4 / レーン2=5〜8 / レーン3=9〜12 / レーン4=13〜16。<br/>
+          トラックは「左から押し込む」挙動で、先に入った荷物ほど運転席側（右）に詰まる表示になる。
+        </div>
+        ${renderTruckHTML()}
+      </div>
+    `;
+    showModal("採点結果", body);
+  });
+
+  ui.modalClose.addEventListener('click', closeModal);
+  ui.modal.addEventListener('click', (e) => { if(e.target === ui.modal) closeModal(); });
+
+  window.addEventListener('keydown', (e) => {
+    if(ui.modal.style.display === "flex"){
+      if(e.key === "Escape") closeModal();
+      return;
+    }
+    const k = e.key;
+    if(k === "ArrowUp") { e.preventDefault(); step(() => doMove(0,-1)); }
+    else if(k === "ArrowDown") { e.preventDefault(); step(() => doMove(0,1)); }
+    else if(k === "ArrowLeft") { e.preventDefault(); step(() => doMove(-1,0)); }
+    else if(k === "ArrowRight") { e.preventDefault(); step(() => doMove(1,0)); }
+    else if(k === " " || k === "Spacebar") { e.preventDefault(); step(() => doGrabDrop()); }
+    else if(k === "Enter") { e.preventDefault(); ui.btnGo.click(); }
+    else if(k === "r" || k === "R") { e.preventDefault(); resetGame(); }
+    else if(k === "n" || k === "N") { e.preventDefault(); newGame(); }
+  }, {passive:false});
+
+  // Tap-to-move/toggle on canvas (adjacent move or grab/drop on same cell)
+  cv.addEventListener('pointerdown', (e) => {
+    const rect = cv.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+
+    // layout at tap time (use rect width to match pointer coords)
+    const w = Math.max(560, Math.floor(rect.width));
+    const h = Math.floor(w * 0.62);
+    const layout = computeLayout(w, h);
+
+    const gx0 = layout.gridX;
+    const gy0 = layout.gridY;
+    const gw = layout.gridW;
+    const gh = layout.gridH;
+
+    const inGrid = (px >= gx0 && px < gx0 + gw && py >= gy0 && py < gy0 + gh);
+    if(!inGrid) return;
+
+    const gx = Math.floor((px - gx0) / layout.cellSize);
+    const gy = Math.floor((py - gy0) / layout.cellSize);
+
+    const dx = gx - crane.x;
+    const dy = gy - crane.y;
+
+    if(dx === 0 && dy === 0){
+      step(() => doGrabDrop());
+      return;
+    }
+    if(Math.abs(dx) + Math.abs(dy) !== 1) return;
+    step(() => doMove(dx, dy));
+  });
+
+  window.addEventListener('resize', () => draw(performance.now()));
+
+  // start
+  newGame();
+})();
+</script>
+
+
+</body>
+</html>
