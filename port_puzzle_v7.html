@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>港湾業務パズル（プロトタイプ）</title>
+  <title>港湾業務パズル</title>
   <style>
     :root{
       --bg:#0b1020;
@@ -271,12 +271,91 @@
       font-size: 11px;
       color: var(--text);
     }
-  </style>
+  
+    /* ===== Start screen ===== */
+    .startOverlay{
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: radial-gradient(1200px 700px at 20% 20%, rgba(122,162,255,.12), transparent 55%),
+                  radial-gradient(900px 500px at 80% 30%, rgba(255,110,110,.08), transparent 55%),
+                  rgba(6,10,22,.92);
+      z-index: 999;
+    }
+    body.start-mode .startOverlay{ display:flex; }
+
+    body.start-mode header,
+    body.start-mode main,
+    body.start-mode .foot{
+      display:none !important;
+    }
+
+    .startCard{
+      width: min(680px, 92vw);
+      border-radius: 20px;
+      padding: 22px 22px 18px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.12);
+      box-shadow: 0 18px 70px rgba(0,0,0,.55);
+      text-align:center;
+      backdrop-filter: blur(10px);
+    }
+    .startTitle{
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: .02em;
+      color: rgba(240,245,255,.96);
+    }
+    .startSub{
+      margin-top: 10px;
+      font-size: 13px;
+      color: rgba(168,179,214,.95);
+    }
+    .startBtn{
+      margin-top: 16px;
+      width: min(320px, 80vw);
+      height: 52px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.16);
+      background: linear-gradient(180deg, rgba(122,162,255,.26), rgba(122,162,255,.10));
+      color: rgba(240,245,255,.96);
+      font-weight: 900;
+      font-size: 18px;
+      letter-spacing: .04em;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .startBtn:active{
+      transform: translateY(1px);
+      filter: brightness(1.08);
+    }
+    .startHint{
+      margin-top: 14px;
+      font-size: 12px;
+      color: rgba(168,179,214,.88);
+    }
+
+    /* Hide reset/shuffle during play (not used) */
+    #btnReset, #btnNew{ display:none !important; }
+</style>
 </head>
-<body>
+<body class="start-mode">
+
+  <div class="startOverlay" id="startOverlay" aria-hidden="false">
+    <div class="startCard">
+      <div class="startTitle">港湾オペレーション</div>
+      <div class="startSub">START を押すと 100 秒の制限時間で開始（Space でも開始）</div>
+      <button id="btnStart" class="startBtn">START</button>
+      <div class="startHint">操作: 矢印=移動 / Space=掴む・離す / Enter=採点</div>
+    </div>
+  </div>
+
   <header>
     <div class="title">
-      <h1>港湾業務パズル（プロトタイプ）</h1>
+      <h1>港湾業務パズル</h1>
       <div class="subtitle">クレーン1台でコンテナを捌いて、各レーンのトラックへ適切な番号帯を積み込む。</div>
     </div>
   </header>
@@ -288,6 +367,7 @@
           <div class="pill">操作数: <b id="moves">0</b></div>
           <div class="pill">積込: <b id="loaded">0</b>/16</div>
           <div class="pill">保持: <b id="holding">なし</b></div>
+          <div class="pill">残り: <b id="timeLeft">100</b>s</div>
         </div>
         <div class="btnrow">
           <button class="primary" id="btnGo">Go（採点）</button>
@@ -366,17 +446,18 @@
     <div class="modal">
       <div class="mh">
         <h3 id="modalTitle">採点結果</h3>
-        <button id="modalClose">閉じる</button>
+        <button id="modalClose">終了</button>
       </div>
       <div class="mb" id="modalBody"></div>
     </div>
   </div>
 
   <div class="foot">
-    単一HTMLで動作するプロトタイプ。iPadではSafariで開いて操作できる。
+    単一HTMLで動作する。iPadではSafariで開いて操作できる。
   </div>
 
 <script>
+
 (() => {
   const ROWS = 4;
   const COLS = 4;
@@ -395,7 +476,10 @@
 
   // ===== UI refs =====
   const ui = {
-    moves: document.getElementById('moves'),
+    timeLeft: document.getElementById('timeLeft'),
+    btnStart: document.getElementById('btnStart'),
+    startOverlay: document.getElementById('startOverlay'),
+moves: document.getElementById('moves'),
     loaded: document.getElementById('loaded'),
     holding: document.getElementById('holding'),
     btnGo: document.getElementById('btnGo'),
@@ -436,6 +520,14 @@
   // {id, type:'spawn'|'load', lane, slot?, t0, dur, from:{kind, ...}, to:{kind, ...}}
   let anims = [];
   let rafId = null;
+
+  // ===== Game flow (start -> playing (100s) -> scored) =====
+  const TIME_LIMIT = 100; // seconds
+  let gameState = 'start';
+  let gameStartTs = 0;
+  let timerId = null;
+  let lastRemain = TIME_LIMIT;
+
 
   // ===== Utility =====
   function mulberry32(a){
@@ -752,11 +844,23 @@
   }
 
   function step(actionFn){
+    if(gameState !== 'playing') return;
     const ok = actionFn();
     if(!ok) return;
     moves += 1;
     applyAuto(true);
-    syncUI();
+    
+    // Auto-score when all 16 containers are loaded
+    if(gameState === 'playing' && totalLoaded() === 16){
+      syncUI();
+      updateTimeUI();
+      draw(performance.now());
+      finishAndScore('complete');
+      return;
+    }
+
+syncUI();
+    updateTimeUI();
     draw(performance.now());
   }
 
@@ -1265,7 +1369,99 @@
     ui.btnGrabDrop.classList.toggle("ok", crane.holding !== null);
   }
 
+  function setStartMode(on){
+    document.body.classList.toggle('start-mode', !!on);
+    if(ui.startOverlay) ui.startOverlay.setAttribute('aria-hidden', on ? 'false' : 'true');
+  }
+
+  function stopTimer(){
+    if(timerId !== null){
+      clearInterval(timerId);
+      timerId = null;
+    }
+  }
+
+  function remainSecondsNow(){
+    if(gameState !== 'playing') return lastRemain;
+    const elapsed = (performance.now() - gameStartTs) / 1000;
+    const remain = Math.max(0, TIME_LIMIT - elapsed);
+    return remain;
+  }
+
+  function updateTimeUI(){
+    const remain = remainSecondsNow();
+    const sec = Math.ceil(remain);
+    lastRemain = remain;
+    if(ui.timeLeft) ui.timeLeft.textContent = String(sec);
+  }
+
+  function goToStartScreen(){
+    stopTimer();
+    gameState = 'start';
+    lastRemain = TIME_LIMIT;
+    ui.modal.style.display = 'none';
+    newGame();          // prepare fresh board immediately
+    updateTimeUI();
+    setStartMode(true);
+  }
+
+  function startGame(){
+    stopTimer();
+    gameState = 'playing';
+    gameStartTs = performance.now();
+    lastRemain = TIME_LIMIT;
+    updateTimeUI();
+    setStartMode(false);
+
+    timerId = setInterval(() => {
+      if(gameState !== 'playing') return;
+      const remain = remainSecondsNow();
+      if(remain <= 0){
+        updateTimeUI();
+        finishAndScore('timeout');
+        return;
+      }
+      updateTimeUI();
+    }, 100);
+  }
+
+  function computeScoreBreakdownWithTime(){
+    const { base, bonus, penalty } = computeScoreBreakdown();
+    const remain = remainSecondsNow();
+    const timeBonus = Math.max(0, Math.floor(remain)); // remaining whole seconds
+    const total = base + bonus + timeBonus - penalty;
+    return { base, bonus, timeBonus, penalty, total, remain };
+  }
+
+  function finishAndScore(reason){
+    if(gameState !== 'playing') return;
+    gameState = 'scored';
+    stopTimer();
+
+    const { base, bonus, timeBonus, penalty, total, remain } = computeScoreBreakdownWithTime();
+
+    const body = `
+      <div style="display:grid; gap:10px;">
+        <div class="kv">
+          <div class="k">積込数</div><div class="v"><b>${totalLoaded()}</b>/16</div>
+          <div class="k">基本点</div><div class="v"><b>+${base}</b>（レーン許容番号のみ）</div>
+          <div class="k">順序ボーナス</div><div class="v"><b>+${bonus}</b>（右隣も許容番号かつ右隣 > 左）</div>
+          <div class="k">残り時間ボーナス</div><div class="v"><b>+${timeBonus}</b>（残り ${Math.ceil(remain)} 秒）</div>
+          <div class="k">操作ペナルティ</div><div class="v"><b>-${penalty}</b></div>
+          <div class="k">最終スコア</div><div class="v"><b>${total}</b></div>
+        </div>
+        <div style="color: rgba(168,179,214,.92); font-size:12px;">
+          制限時間（100秒）超過時は自動で採点。途中で採点すると残り時間がそのまま加点。
+        </div>
+        ${renderTruckHTML()}
+      </div>
+    `;
+    showModal("採点結果", body);
+  }
+
   // ===== Events =====
+  ui.btnStart.addEventListener('click', () => startGame());
+
   ui.btnUp.addEventListener('click', () => step(() => doMove(0,-1)));
   ui.btnDown.addEventListener('click', () => step(() => doMove(0, 1)));
   ui.btnLeft.addEventListener('click', () => step(() => doMove(-1,0)));
@@ -1277,47 +1473,43 @@
   ui.btnNew.addEventListener('click', () => newGame());
 
   ui.btnGo.addEventListener('click', () => {
-    const { base, bonus, penalty, total } = computeScoreBreakdown();
-    const body = `
-      <div style="display:grid; gap:10px;">
-        <div class="kv">
-          <div class="k">積込数</div><div class="v"><b>${totalLoaded()}</b>/16</div>
-          <div class="k">基本点</div><div class="v"><b>+${base}</b>（レーン許容番号のみ）</div>
-          <div class="k">順序ボーナス</div><div class="v"><b>+${bonus}</b>（右隣も許容番号かつ右隣 > 左）</div>
-          <div class="k">操作ペナルティ</div><div class="v"><b>-${penalty}</b></div>
-          <div class="k">最終スコア</div><div class="v"><b>${total}</b></div>
-        </div>
-        <div style="color: rgba(168,179,214,.92); font-size:12px;">
-          各レーンの許容番号: レーン1=1〜4 / レーン2=5〜8 / レーン3=9〜12 / レーン4=13〜16。<br/>
-          トラックは「左から押し込む」挙動で、先に入った荷物ほど運転席側（右）に詰まる表示になる。
-        </div>
-        ${renderTruckHTML()}
-      </div>
-    `;
-    showModal("採点結果", body);
+    if(gameState !== 'playing') return;
+    finishAndScore('manual');
   });
 
-  ui.modalClose.addEventListener('click', closeModal);
-  ui.modal.addEventListener('click', (e) => { if(e.target === ui.modal) closeModal(); });
+ui.modalClose.addEventListener('click', () => { closeModal(); goToStartScreen(); });
 
-  window.addEventListener('keydown', (e) => {
-    if(ui.modal.style.display === "flex"){
-      if(e.key === "Escape") closeModal();
+ui.modal.addEventListener('click', (e) => { /* backdrop click disabled: use 終了 */ });
+
+window.addEventListener('keydown', (e) => {
+    const k = e.key;
+
+    // Start screen: only Space/Enter starts
+    if(gameState === 'start'){
+      if(k === ' ' || k === 'Spacebar' || k === 'Enter'){
+        e.preventDefault();
+        startGame();
+      }
       return;
     }
-    const k = e.key;
+
+    // Scored: ignore keys (use 終了)
+    if(gameState !== 'playing') return;
+
+    // Modal visible: ignore keys (use 終了)
+    if(ui.modal.style.display === "flex") return;
+
     if(k === "ArrowUp") { e.preventDefault(); step(() => doMove(0,-1)); }
     else if(k === "ArrowDown") { e.preventDefault(); step(() => doMove(0,1)); }
     else if(k === "ArrowLeft") { e.preventDefault(); step(() => doMove(-1,0)); }
     else if(k === "ArrowRight") { e.preventDefault(); step(() => doMove(1,0)); }
     else if(k === " " || k === "Spacebar") { e.preventDefault(); step(() => doGrabDrop()); }
     else if(k === "Enter") { e.preventDefault(); ui.btnGo.click(); }
-    else if(k === "r" || k === "R") { e.preventDefault(); resetGame(); }
-    else if(k === "n" || k === "N") { e.preventDefault(); newGame(); }
-  }, {passive:false});
+}, {passive:false});
 
   // Tap-to-move/toggle on canvas (adjacent move or grab/drop on same cell)
   cv.addEventListener('pointerdown', (e) => {
+    if(gameState !== 'playing') return;
     const rect = cv.getBoundingClientRect();
     const px = e.clientX - rect.left;
     const py = e.clientY - rect.top;
@@ -1352,8 +1544,9 @@
   window.addEventListener('resize', () => draw(performance.now()));
 
   // start
-  newGame();
+  goToStartScreen();
 })();
+
 </script>
 
 
